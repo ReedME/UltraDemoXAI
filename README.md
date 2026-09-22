@@ -2,6 +2,8 @@
 
 Point your AI Agent at your web app and get a narrated demo video. Everything runs on **your** machine: your credentials, your data, and your renders never leave it.
 
+This repository is a fork of [new-xp/ultrademo](https://github.com/new-xp/ultrademo) by [New XP](https://newxp.co) (Copyright 2026 New XP), used under the [Apache License 2.0](LICENSE). The xAI narration work is a modification on top of that project. See [NOTICE](NOTICE).
+
 ## See it work
 
 ![Ultrademo output: building a project tracker in Notion, captured and narrated automatically](docs/notion-tracker-2026-07-10.gif)
@@ -47,12 +49,34 @@ Built and tested with Claude Code; any agent that reads `AGENTS.md` can follow t
 **Or set up the workspace yourself** (no skill CLI, or you just want the pipeline):
 
 ```bash
-git clone https://github.com/new-xp/ultrademo ultrademo-workspace && cd ultrademo-workspace
+git clone https://github.com/ReedME/UltraDemoXAI.git ultrademo-workspace && cd ultrademo-workspace
 npm ci
 npx playwright install chromium
 npm run doctor                 # verifies your environment
-cp .env.example .env           # optional: add XAI_API_KEY (or ELEVENLABS_API_KEY) for premium narration
+cp .env.example .env           # add XAI_API_KEY for narration
 ```
+
+## Narration with xAI
+
+xAI is the voice this fork uses. ElevenLabs still works if you set `TTS_PROVIDER=elevenlabs` and `ELEVENLABS_API_KEY`. With neither key, the pipeline falls back to Piper, then macOS `say`.
+
+1. Create an API key in the [xAI console](https://console.x.ai/).
+2. Copy `.env.example` to `.env` and set `XAI_API_KEY`. Do not commit `.env`.
+3. Pick a voice with `XAI_VOICE_ID`. Built-ins include `eve` (the default), `iris`, `altair`, `ara`, `rex`, `sal`, and `leo`. A custom voice id works too. `XAI_LANGUAGE` is a BCP-47 code such as `en`, or `auto`.
+4. If an ElevenLabs key is also in `.env`, set `TTS_PROVIDER=xai` so xAI wins.
+
+```bash
+XAI_API_KEY=your-key
+XAI_VOICE_ID=altair
+XAI_LANGUAGE=en
+TTS_PROVIDER=xai
+```
+
+Then `npm run tts -- <project>`. Each line is cached by voice and text, so a re-render does not call xAI again unless the line or the voice changed. `npm run tts -- <project> --redo <sceneId|all>` forces those lines.
+
+Scene `script` strings can include [xAI speech tags](https://docs.x.ai/developers/model-capabilities/audio/text-to-speech). Inline tags such as `[pause]` and `[long-pause]` sit between phrases. Wrapping tags change delivery, for example `<emphasis>Then what?</emphasis>`, `<fast>`, or `<slow>`. Captions drop the tags, so they are not printed on screen. Put double quotes only around exact on-screen labels (`"Responses"`). Those stay in the captions and are tinted.
+
+Changing `XAI_VOICE_ID` busts the cache for every line. Run `npm run tts` again, then `npm run render`.
 
 With the folder open in Claude Code (or another AGENTS.md-aware agent), just ask for a demo video. Prefer to drive it by hand? See **Manually** below.
 
