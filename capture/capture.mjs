@@ -310,7 +310,8 @@ for (const scene of flow.scenes) {
     let focus;
     if (scene.target) {
       const locator = page.locator(scene.target).first();
-      await locator.waitFor({state: 'visible', timeout: 10_000});
+      await locator.waitFor({state: 'attached', timeout: 10_000});
+      await locator.scrollIntoViewIfNeeded().catch(() => {});
       const box = await locator.boundingBox();
       if (box) {
         const x = Math.round(box.x + box.width / 2);

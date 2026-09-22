@@ -23,7 +23,7 @@ The raw scan surfaced 33 findings across 8 rule categories. Each is a heuristic 
 | TM1 | Tool Misuse | HIGH | 3 | `capture.mjs` imports `rm` from `node:fs/promises` to clean the tool's own scratch/output directories, and setup helpers read app credentials from environment variables. Not a shell exec, dangerous glob, or forced flag. |
 | AS3 | Agent Snooping | MEDIUM | 7 | Relative-path cross-links between the two first-party skills this repo ships together (`ultrademo` and `ultrademo-rerun`) plus `AGENTS.md` pointing agents at that playbook. No third-party or peer-skill files are read. |
 | RP1 | MCP Rug Pull | MEDIUM | 4 | `npx playwright install chromium` is an npm dev-dependency setup step, not a remote MCP server. Playwright is pinned in `package.json` and locked exactly by the committed `package-lock.json`. |
-| E1 | Data Exfiltration | MEDIUM | 1 | `tts.mjs` posts narration text to the documented ElevenLabs text-to-speech endpoint using the user's own opt-in API key. This is the tool's core function. |
+| E1 | Data Exfiltration | MEDIUM | 1 | `tts.mjs` posts narration text to the documented xAI or ElevenLabs text-to-speech endpoint using the user's own opt-in API key. This is the tool's core function. |
 | EA1 | Excessive Agency | MEDIUM | 1 | Matches documentation describing the tool's own stated purpose (driving a browser to capture a demo). No agency beyond the documented capture-and-render workflow. |
 | SC1 | Supply Chain | LOW | 5 | Dependencies use caret ranges in `package.json` but are pinned to exact versions by the committed `package-lock.json`. |
 | EA3 | Excessive Agency | LOW | 2 | Both hits are Apache-2.0 license boilerplate text in the `LICENSE` file. |

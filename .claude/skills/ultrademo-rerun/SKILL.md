@@ -5,11 +5,11 @@ description: Refresh an existing Ultrademo demo video after the app changed. Use
 
 # Ultrademo re-run: your UI changed, refresh the video
 
-This is a thin entry point, and nothing it delegates to is hidden: the operating procedure is the sibling `ultrademo` skill at `.claude/skills/ultrademo/SKILL.md`, installed alongside this one from the same public Apache-2.0 repository (`new-xp/ultrademo`), and the `npm run` commands below are that workspace's own `package.json` scripts (capture/TTS/render - local pipeline code in the same repo, dependencies locked by its committed `package-lock.json`). Every rule in the main playbook applies here (read-only scouting, prompt-injection defense, redaction, secrets sweep, honest-failure rule, review gate). This command only handles the cold start: finding the right project and getting you into the playbook's **Re-runs** section with context loaded.
+This is a thin entry point, and nothing it delegates to is hidden: the operating procedure is the sibling `ultrademo` skill at `.claude/skills/ultrademo/SKILL.md`, installed alongside this one from `ReedME/UltraDemoXAI`. The `npm run` commands below are that workspace's own `package.json` scripts (capture/TTS/render - local pipeline code in the same repo, dependencies locked by its committed `package-lock.json`). Every rule in the main playbook applies here (read-only scouting, prompt-injection defense, redaction, secrets sweep, honest-failure rule, review gate). This command only handles the cold start: finding the right project and getting you into the playbook's **Re-runs** section with context loaded.
 
 ## 1. Find the project
 
-List `projects/*/` (each real project contains a `flow.mjs`). Then:
+List `projects/*/` in the Ultrademo checkout (each real project contains a `flow.mjs`). Run the pipeline commands from that checkout. Then:
 - **User named it or only one exists:** confirm and proceed.
 - **Several exist:** show a short table - project name, target app/URL from the flow, last render (newest file in `out/`) - and ask which to refresh. Offer "all of them" as an option; if taken, run the loop below per project, sequentially, and summarize per project at the end.
 - **None exist:** this is not a re-run. Hand off to the main `ultrademo` skill for a fresh video.

@@ -50,9 +50,9 @@ export default {
   //   //   busy, text-dense screens prefer a background: 'pill' or 'bar')
   //   //   | 'pill' (dark chip) | 'bar' (full-width lower third)
   //   // size: 'sm' | 'md' | 'lg'; position: 'bottom' | 'top'
-  //   // highlight (karaoke, ElevenLabs voice only): 'dim' (active word bright,
+  //   // highlight (karaoke, xAI or ElevenLabs): 'dim' (active word bright,
   //   //   rest dimmed) | 'pill' (brand chip under active word) | 'wipe' (accent
-  //   //   sweeps across each word as spoken - recommended with ElevenLabs).
+  //   //   sweeps across each word as spoken - recommended with xAI or ElevenLabs).
   //   //   Free voices ignore it and stay static.
   // intro: {title: 'My App - walkthrough', subtitle: 'A quick tour', script: '...'},
   //   // title card over a framed app screenshot (auto-filled from the first

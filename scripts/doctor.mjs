@@ -46,7 +46,7 @@ try {
   bad('remotion not installed', 'npm install');
 }
 
-// Voice chain: ElevenLabs -> Piper -> macOS say
+// Voice chain: xAI -> ElevenLabs -> Piper -> macOS say
 let hasPiper = false;
 try {
   execFileSync('piper', ['--help'], {stdio: 'ignore'});
@@ -54,17 +54,25 @@ try {
 } catch {
   /* not installed */
 }
-if (process.env.ELEVENLABS_API_KEY) {
-  ok('ELEVENLABS_API_KEY set', 'narration will use ElevenLabs');
-} else if (hasPiper) {
-  ok('piper installed', 'free offline narration; set ELEVENLABS_API_KEY in .env for premium voice');
-} else if (process.platform === 'darwin') {
-  info('no ELEVENLABS_API_KEY and no piper - narration falls back to the macOS `say` placeholder voice.');
-  info('  better free option: pip install piper-tts · premium: ELEVENLABS_API_KEY=... in .env');
+const provider = process.env.TTS_PROVIDER?.trim().toLowerCase();
+if (provider === 'xai' || (!provider && process.env.XAI_API_KEY)) {
+  if (process.env.XAI_API_KEY) ok('XAI_API_KEY set', `narration will use xAI (${process.env.XAI_VOICE_ID ?? 'eve'})`);
+  else bad('TTS_PROVIDER=xai but XAI_API_KEY is missing', 'add XAI_API_KEY=... to .env');
+} else if (provider === 'elevenlabs' || (!provider && process.env.ELEVENLABS_API_KEY)) {
+  if (process.env.ELEVENLABS_API_KEY) ok('ELEVENLABS_API_KEY set', 'narration will use ElevenLabs');
+  else bad('TTS_PROVIDER=elevenlabs but ELEVENLABS_API_KEY is missing', 'add ELEVENLABS_API_KEY=... to .env');
+} else if (provider === 'piper' || (!provider && hasPiper)) {
+  if (hasPiper) ok('piper installed', 'free offline narration; set XAI_API_KEY or ELEVENLABS_API_KEY in .env for a premium voice');
+  else bad('TTS_PROVIDER=piper but piper is not installed', 'pip install piper-tts');
+} else if (provider === 'say' || process.platform === 'darwin') {
+  info('no XAI_API_KEY, ELEVENLABS_API_KEY, or piper - narration falls back to the macOS `say` placeholder voice.');
+  info('  better free option: pip install piper-tts · premium: XAI_API_KEY=... or ELEVENLABS_API_KEY=... in .env');
+} else if (provider) {
+  bad(`unknown TTS_PROVIDER "${provider}"`, 'use xai, elevenlabs, piper, or say');
 } else {
   bad(
-    'no voice available (no ELEVENLABS_API_KEY, no piper, no macOS say)',
-    'pip install piper-tts  (free, offline)  or add ELEVENLABS_API_KEY=... to .env',
+    'no voice available (no XAI_API_KEY, no ELEVENLABS_API_KEY, no piper, no macOS say)',
+    'pip install piper-tts  (free, offline)  or add XAI_API_KEY=... to .env',
   );
 }
 

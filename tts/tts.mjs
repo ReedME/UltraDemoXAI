@@ -3,9 +3,10 @@
 // its duration with ffprobe, and writes audio/audioDuration back into the
 // storyboard.
 //
-// Voice chain: ElevenLabs (ELEVENLABS_API_KEY in .env) -> Piper if installed
-// (free, offline, cross-platform: `pip install piper-tts`) -> macOS `say`
-// placeholder -> error with install instructions.
+// Voice chain: xAI (XAI_API_KEY in .env) -> ElevenLabs (ELEVENLABS_API_KEY) ->
+// Piper if installed (free, offline, cross-platform: `pip install piper-tts`)
+// -> macOS `say` placeholder -> error with install instructions.
+// Set TTS_PROVIDER=xai|elevenlabs|piper|say to pick one explicitly.
 //
 // Unchanged lines are cached: each clip stores a signature of (engine, voice,
 // text); re-runs only synthesize scenes whose script or voice changed, so
@@ -20,6 +21,9 @@ import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+const XAI_API_KEY = process.env.XAI_API_KEY;
+const XAI_VOICE_ID = process.env.XAI_VOICE_ID ?? 'eve';
+const XAI_LANGUAGE = process.env.XAI_LANGUAGE ?? 'en';
 const VOICE_ID = process.env.ELEVENLABS_VOICE_ID ?? 'UM3TOcm5kcELI84GFoAz'; // default demo voice
 const MODEL_ID = process.env.ELEVENLABS_MODEL_ID ?? 'eleven_multilingual_v2';
 const API_KEY = process.env.ELEVENLABS_API_KEY;
@@ -50,31 +54,53 @@ const hasPiper = (() => {
   }
 })();
 
-const engine = API_KEY
-  ? 'elevenlabs'
-  : hasPiper
-    ? 'piper'
-    : process.platform === 'darwin'
-      ? 'say'
-      : null;
+const available = {
+  xai: Boolean(XAI_API_KEY),
+  elevenlabs: Boolean(API_KEY),
+  piper: hasPiper,
+  say: process.platform === 'darwin',
+};
 
-if (!engine) {
+const requested = process.env.TTS_PROVIDER?.trim().toLowerCase();
+const engine = requested
+  ? requested
+  : available.xai
+    ? 'xai'
+    : available.elevenlabs
+      ? 'elevenlabs'
+      : available.piper
+        ? 'piper'
+        : available.say
+          ? 'say'
+          : null;
+
+if (requested && !Object.hasOwn(available, requested)) {
+  console.error(
+    `Unknown TTS_PROVIDER "${requested}". Use xai, elevenlabs, piper, or say.`,
+  );
+  process.exit(1);
+}
+if (!engine || !available[engine]) {
   console.error(
     'No voice available. Either:\n' +
-      '  - add ELEVENLABS_API_KEY=... to a .env file in this folder, or\n' +
+      '  - add XAI_API_KEY=... to a .env file in this folder, or\n' +
+      '  - add ELEVENLABS_API_KEY=... to that .env file, or\n' +
       '  - install Piper (free, offline): pip install piper-tts',
   );
   process.exit(1);
 }
 
 const voiceSig =
-  engine === 'elevenlabs'
-    ? `elevenlabs:${VOICE_ID}:${MODEL_ID}:${STABILITY}:${SIMILARITY}`
-    : engine === 'piper'
-      ? `piper:${PIPER_MODEL}`
-      : 'say';
+  engine === 'xai'
+    ? `xai:${XAI_VOICE_ID}:${XAI_LANGUAGE}`
+    : engine === 'elevenlabs'
+      ? `elevenlabs:${VOICE_ID}:${MODEL_ID}:${STABILITY}:${SIMILARITY}`
+      : engine === 'piper'
+        ? `piper:${PIPER_MODEL}`
+        : 'say';
 
 const labels = {
+  xai: `xAI (voice ${XAI_VOICE_ID}, ${XAI_LANGUAGE})`,
   elevenlabs: `ElevenLabs (voice ${VOICE_ID})`,
   piper: `Piper (${PIPER_MODEL}, offline)`,
   say: 'macOS say fallback (placeholder voice)',
@@ -98,7 +124,20 @@ const wordsFromAlignment = (al) => {
   const {characters: ch, character_start_times_seconds: st, character_end_times_seconds: en} = al;
   const words = [];
   let cur = null;
+  let skipUntil = '';
   for (let i = 0; i < ch.length; i++) {
+    if (skipUntil) {
+      if (ch[i] === skipUntil) skipUntil = '';
+      continue;
+    }
+    if (ch[i] === '[') {
+      skipUntil = ']';
+      continue;
+    }
+    if (ch[i] === '<') {
+      skipUntil = '>';
+      continue;
+    }
     if (/\s/.test(ch[i])) {
       if (cur) (words.push(cur), (cur = null));
       continue;
@@ -134,8 +173,37 @@ const elevenlabs = async (text, outFile) => {
   return wordsFromAlignment(data.alignment);
 };
 
+const wordsFromXaiTimestamps = (timestamps) => {
+  if (!timestamps?.graph_chars?.length || !timestamps?.graph_times?.length) return null;
+  return wordsFromAlignment({
+    characters: timestamps.graph_chars,
+    character_start_times_seconds: timestamps.graph_times.map((span) => span[0]),
+    character_end_times_seconds: timestamps.graph_times.map((span) => span[1]),
+  });
+};
+
+const xai = async (text, outFile) => {
+  const res = await fetch('https://api.x.ai/v1/tts', {
+    method: 'POST',
+    headers: {Authorization: `Bearer ${XAI_API_KEY}`, 'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      text,
+      voice_id: XAI_VOICE_ID,
+      language: XAI_LANGUAGE,
+      with_timestamps: true,
+      output_format: {codec: 'mp3', sample_rate: 44100, bit_rate: 128000},
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`xAI TTS ${res.status}: ${await res.text()}`);
+  }
+  const data = await res.json();
+  await writeFile(outFile, Buffer.from(data.audio, 'base64'));
+  return wordsFromXaiTimestamps(data.audio_timestamps);
+};
+
 // Piper/say don't emit word timings, so they return null: captions stay static
-// on the free voices (karaoke word-highlight is an ElevenLabs-only feature).
+// on the free voices (karaoke word-highlight needs xAI or ElevenLabs).
 const piper = (text, outFile) => {
   const wav = outFile.replace(/\.mp3$/, '.wav');
   const modelDir = path.join(os.homedir(), '.ultrademo', 'piper');
@@ -158,7 +226,7 @@ const macSay = (text, outFile) => {
   return null;
 };
 
-const synth = {elevenlabs, piper, say: macSay}[engine];
+const synth = {xai, elevenlabs, piper, say: macSay}[engine];
 
 // Narratable units: every scene, plus the intro/outro slides when they carry a
 // script (the renderer starts slide audio slightly after the card appears and

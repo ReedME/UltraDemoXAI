@@ -31,7 +31,7 @@ export type CaptionStyle = {
   size?: 'sm' | 'md' | 'lg';
   position?: 'bottom' | 'top';
   accent?: string; // background/bar tint (hex)
-  // Karaoke word-highlight (needs per-word timings -> ElevenLabs voice only;
+  // Karaoke word-highlight (needs per-word timings -> xAI or ElevenLabs;
   // free voices fall back to the static caption). Off unless set.
   highlight?: 'dim' | 'pill' | 'wipe';
   // Tint for double-quoted UI literals in the script. Deliberately NOT the
@@ -57,9 +57,15 @@ export type IntroSlide = SlideNarration & {
   title: string;
   subtitle?: string;
   screenshot?: string;
+  logo?: string;
   layout?: 'stacked' | 'split';
 };
-export type OutroSlide = SlideNarration & {title: string; subtitle?: string; url?: string};
+export type OutroSlide = SlideNarration & {
+  title: string;
+  subtitle?: string;
+  url?: string;
+  logo?: string;
+};
 
 export type Scene = {
   id: string;
@@ -152,7 +158,11 @@ const QUOTE_RE = /["“”]/g;
 
 type TextRun = {text: string; literal: boolean};
 
+const stripSpeechTags = (text: string) =>
+  text.replace(/\[[^\]]*\]|<[^>]+>/g, '').replace(/[ \t]{2,}/g, ' ');
+
 const parseLiterals = (text: string): TextRun[] => {
+  text = stripSpeechTags(text);
   const runs: TextRun[] = [];
   const re = /"([^"]*)"|“([^”]*)”/g;
   let last = 0;
@@ -560,10 +570,17 @@ const StillScene: React.FC<{scene: Scene; prev: Scene | null}> = ({scene, prev})
   });
   const showRipple = scene.action?.type === 'click' && ripple > 0 && ripple < 1;
 
+  // Slide the focus point toward the upper middle as the zoom settles, so the
+  // named control ends in frame and clear of the bottom caption bar.
+  const shift = focus && zoom > 1 ? (scale - 1) / (zoom - 1) : 0;
+  const tx = focus ? (SRC.width / 2 - focus.x) * shift : 0;
+  const ty = focus ? (SRC.height * 0.4 - focus.y) * shift : 0;
+
   return (
+    <AbsoluteFill style={{overflow: 'hidden', backgroundColor: '#0f172a'}}>
     <AbsoluteFill
       style={{
-        transform: `scale(${scale})`,
+        transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
         transformOrigin: focus ? `${focus.x}px ${focus.y}px` : '50% 50%',
       }}
     >
@@ -593,6 +610,7 @@ const StillScene: React.FC<{scene: Scene; prev: Scene | null}> = ({scene, prev})
         </>
       ) : null}
     </AbsoluteFill>
+    </AbsoluteFill>
   );
 };
 
@@ -610,6 +628,28 @@ const SlideView: React.FC<{
   const fade = interpolate(frame, [0, 18], [0, 1], {extrapolateRight: 'clamp'});
   const title = kind === 'intro' ? intro?.title : outro?.title;
   const subtitle = kind === 'intro' ? intro?.subtitle : outro?.subtitle;
+  const logo = kind === 'intro' ? intro?.logo : outro?.logo;
+  const logoScale = interpolate(frame, [0, 14, 26], [0.62, 1.1, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.cubic),
+  });
+  const logoPop = interpolate(frame, [0, 12], [0, 1], {extrapolateRight: 'clamp'});
+  const glow = 0.45 + 0.35 * Math.sin(frame / 8);
+  const textAt = logo ? 16 : 0;
+  const textRise = interpolate(frame, [textAt, textAt + 16], [36, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.cubic),
+  });
+  const textFade = interpolate(frame, [textAt, textAt + 14], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const bar = interpolate(frame, [textAt, textAt + 12], [0, 72], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
   // A narrated slide shares the frame with its caption: shift the card content
   // away from the caption band so the two text layers never collide.
   const narrated = Boolean(kind === 'intro' ? intro?.audio : outro?.audio);
@@ -618,8 +658,24 @@ const SlideView: React.FC<{
   // don't have the width for it, so they always stack.
   const split = kind === 'intro' && intro?.layout === 'split' && Boolean(intro?.screenshot) && layout !== 'vertical';
 
+  const logoCard = logo ? (
+    <div
+      style={{
+        transform: `scale(${logoScale}) translateY(${(1 - logoPop) * 18}px)`,
+        opacity: logoPop,
+        marginBottom: 48,
+        background: '#ffffff',
+        borderRadius: 22,
+        padding: '26px 42px',
+        boxShadow: `0 30px 80px -24px rgba(0,0,0,0.55), 0 0 ${48 + glow * 36}px rgba(37,99,235,${0.35 + glow * 0.25})`,
+      }}
+    >
+      <Img src={staticFile(logo)} style={{width: layout === 'vertical' ? 420 : 520, height: 'auto', display: 'block'}} />
+    </div>
+  ) : null;
+
   const screenshotCard =
-    kind === 'intro' && intro?.screenshot ? (
+    kind === 'intro' && intro?.screenshot && !logo ? (
       <div
         style={{
           transform: `translateY(${rise * -0.6}px)`,
@@ -640,14 +696,14 @@ const SlideView: React.FC<{
   const textBlock = (
     <div
       style={{
-        transform: `translateY(${rise}px)`,
-        opacity: fade,
+        transform: `translateY(${textRise}px)`,
+        opacity: textFade,
         textAlign: split ? 'left' : 'center',
         padding: split ? 0 : '0 80px',
         ...(split ? {flex: 1, minWidth: 0} : {}),
       }}
     >
-      <div style={{width: 54, height: 5, background: brand, borderRadius: 3, margin: split ? '0 0 30px' : '0 auto 30px'}} />
+      <div style={{width: bar, height: 5, background: brand, borderRadius: 3, margin: split ? '0 0 30px' : '0 auto 30px'}} />
       <div
         style={{
           color: '#f8fafc',
@@ -693,6 +749,7 @@ const SlideView: React.FC<{
         </>
       ) : (
         <>
+          {logoCard}
           {screenshotCard}
           {textBlock}
         </>

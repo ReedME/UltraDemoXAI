@@ -17,7 +17,7 @@ Ultrademo is a capture-and-render pipeline plus a Claude Code skill that drives 
 - Node 20+ (22 recommended), macOS / Linux / Windows
 - ffmpeg + ffprobe (`brew install ffmpeg` / `apt install ffmpeg` / `winget install ffmpeg`)
 - Chromium for Playwright (`npx playwright install chromium`)
-- A voice, best-first: an [ElevenLabs](https://elevenlabs.io) API key in `.env` (premium) → [Piper](https://github.com/rhasspy/piper) (`pip install piper-tts` - free, offline, all platforms) → macOS `say` (zero-install placeholder). Unchanged narration lines are cached, so re-renders never re-bill your ElevenLabs quota.
+- A voice, best-first: an [xAI](https://docs.x.ai/developers/model-capabilities/audio/text-to-speech) API key in `.env` (`XAI_API_KEY`) → an [ElevenLabs](https://elevenlabs.io) API key → [Piper](https://github.com/rhasspy/piper) (`pip install piper-tts` - free, offline, all platforms) → macOS `say` (zero-install placeholder). Set `TTS_PROVIDER` to force one. Unchanged narration lines are cached, so re-renders never re-bill a paid voice.
 
 ## Install
 
@@ -51,7 +51,7 @@ git clone https://github.com/new-xp/ultrademo ultrademo-workspace && cd ultradem
 npm ci
 npx playwright install chromium
 npm run doctor                 # verifies your environment
-cp .env.example .env           # optional: add ELEVENLABS_API_KEY for premium narration
+cp .env.example .env           # optional: add XAI_API_KEY (or ELEVENLABS_API_KEY) for premium narration
 ```
 
 With the folder open in Claude Code (or another AGENTS.md-aware agent), just ask for a demo video. Prefer to drive it by hand? See **Manually** below.
@@ -79,7 +79,7 @@ Each video is a self-contained project folder - assets and outputs together, not
 
 ```
 ultrademo-workspace/
-├── .env                          # ELEVENLABS_API_KEY=... (optional, gitignored)
+├── .env                          # XAI_API_KEY=... or ELEVENLABS_API_KEY=... (optional, gitignored)
 ├── .claude/skills/ultrademo/     # the skill (active when this folder is open in Claude Code)
 ├── .profiles/                    # signed-in browser sessions from `npm run login` (gitignored)
 ├── capture/  tts/  render/  scripts/   # pipeline code (+ capture/flow-template.mjs)
